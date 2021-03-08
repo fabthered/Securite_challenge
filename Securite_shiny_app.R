@@ -16,14 +16,13 @@ library(scales)
 
 #logs <- read.table("C:/Users/bapti/Onedrive/Bureau/Securite_challenge/logs_fw-3.csv", sep=';', header=T)
 logs <- read.table("~/Perso/Univ Lyon2/Challenge/données/logs_fw-3.csv", sep=';', header=T)
-
-# Pre traitement
-hour_of_event <- hour(logs$datetime)
-eventdata <- data.frame(datetime = logs$datetime, eventhour = hour_of_event)
-eventdata$Horaire <- eventdata$eventhour %in% seq(7, 18)
-eventdata$Horaire[eventdata$Horaire =="TRUE"] <-"Horaires ouvrés"
-eventdata$Horaire[eventdata$Horaire =="FALSE"] <-"Horaires non ouvrés"
-
+logs$heure <- hour(logs$datetime)
+logs$Horaire <- logs$heure %in% seq(7, 18)
+logs$Horaire[logs$Horaire =="TRUE"] <-"Horaires ouvrés"
+logs$Horaire[logs$Horaire =="FALSE"] <-"Horaires non ouvrés"
+logs$date <- date(logs$datetime)
+nbdays <- length(unique(logs$date))
+               
 ## Only run examples in interactive R sessions
 
 ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
@@ -68,9 +67,14 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                               mainPanel(
                                 tabsetPanel(
                                   tabPanel('Analyse des flux', 
+                                           plotly::plotlyOutput('date_hist') %>% withSpinner(color="darkgrey"),
                                            plotly::plotlyOutput('proto_hist') %>% withSpinner(color="darkgrey"),
-                                           plotOutput('proto_coord') %>% withSpinner(color="darkgrey"),
-                                           plotOutput('proto_bar') %>% withSpinner(color="darkgrey"),
+                                           fluidRow(
+                                             column(6, 
+                                                    plotOutput('proto_coord') %>% withSpinner(color="darkgrey")),
+                                             column(6,
+                                                    plotOutput('proto_bar') %>% withSpinner(color="darkgrey"))
+                                             ),
                                            fluidRow(
                                              column(6, 
                                                      tags$h4(("TOP 5 IP source les plus émettrices en TCP"), color = "red"),
@@ -97,22 +101,30 @@ server <- function(input, output) {
   
   #Filtre les données
   logs_filter <- reactive({
-    logs %>%
-      #filter(dstport = input$port) %>%
-      filter(proto = input$protocole)
+    if (input$protocole != "TCP & UDP") {
+      logs %>%
+        filter(proto == input$protocole)
+    } else {
+      return(logs)
+    }
   })
     
+  output$date_hist <- plotly::renderPlotly({
+    ggplot(logs_filter(), aes(x = date, fill=action)) +
+      geom_histogram(bins=nbdays,colour = "grey")
+  })
   
   # affichage UDP/TCP par heure
   output$proto_hist <- plotly::renderPlotly({
-    ggplot(eventdata, aes(x = eventhour, fill = Horaire)) +
-      geom_histogram(breaks = seq(0,24), colour = "grey")
+    ggplot(logs_filter(), aes(x = heure, fill = Horaire)) +
+      geom_histogram(breaks = seq(0,24), colour = "grey") +
+      scale_fill_brewer()
   })
   
   
   # affichage coord polaires
   output$proto_coord <- renderPlot({
-    ggplot(eventdata, aes(x = eventhour, fill = Horaire)) +
+    ggplot(logs_filter(), aes(x = heure, fill = Horaire)) +
     geom_histogram(breaks = seq(0,
                                 24), colour = "grey") +
     coord_polar(start = 0) + theme_minimal() +

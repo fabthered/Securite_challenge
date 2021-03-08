@@ -5,18 +5,22 @@
 library(shiny)
 library(shinythemes)
 library(dplyr)
-#library(readr)
 library(ggplot2)
-library(xlsx)
-library(stringr)
 library(shinycssloaders)
-library(tidyverse)
-library(topicmodels)
+library(lubridate)
+library(scales)
+#library(readr)
+#library(xlsx)
+#library(stringr)
+#library(tidyverse)
+
+
+logs <- read.table("~/Perso/Univ Lyon2/Challenge/données/logs_fw-3.csv", sep=';', header=T)
 
 
 ## Only run examples in interactive R sessions
 
-ui <- fluidPage( titlePanel("CHALLENGE SECURITE MS SISE / OPSIE"),
+ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                  theme = shinythemes::shinytheme('flatly'),
                               sidebarPanel(width = 2,
                                 radioButtons(
@@ -57,7 +61,9 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE MS SISE / OPSIE"),
                               ),
                               mainPanel(
                                 tabsetPanel(
-                                  tabPanel('Synthèse des flux' 
+                                  tabPanel('Analyse des flux', 
+                                           #plotly::plotlyOutput('proto_hist') %>% withSpinner(color="darkgrey"),
+                                           plotly::plotlyOutput('proto_bar') %>% withSpinner(color="darkgrey")
                                            #DT::dataTableOutput("contents") %>% withSpinner(color="darkgrey")
                                            ),
                                   tabPanel('Visualisation données brutes'
@@ -71,7 +77,33 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE MS SISE / OPSIE"),
 
 
 server <- function(input, output) {
+  
+  # # affichage UDP/TCP par heure
+  # output$proto_hist <- renderPlot({
+  #   hour_of_event <- hour(logs$datetime)
+  #   eventdata <- data.frame(datetime = logs$datetime, eventhour = hour_of_event)
+  #   eventdata$Horaire <- eventdata$eventhour %in% seq(7, 18)
+  #   eventdata$Horaire[eventdata$Horaire =="TRUE"] <-"Horaires ouvrés"
+  #   eventdata$Horaire[eventdata$Horaire =="FALSE"] <-"Horaires non ouvrés"
+  #   ggplot(eventdata, aes(x = eventhour, fill = Horaire)) +
+  #     geom_histogram(breaks = seq(0,24), colour = "grey")
+  # })
 
+  output$proto_bar <- renderPlot({
+    #création d'un tableau dynamique croisé pour afficher les freq par protocole
+    diff_proto_1<-table(logs$proto)
+    df_diff_proto_1 <-as.data.frame(diff_proto_1)
+    
+    barplot(df_diff_proto_1$Freq, main="Histogramme des protocoles utilisés",
+            xlab="Protocoles",
+            ylab="Nombre de Hits",col=c("lavender","lightcyan1"))
+    #on affiche les valeurs de notre graph
+    text(x = df_diff_proto_1$Var1, y = 50000, label = df_diff_proto_1$Freq, cex =1, pos=1.9)
+    axis(1, at=df_diff_proto_1$Var1, labels=df_diff_proto_1$Var1,
+         tick=FALSE, las=1, line=1, cex.axis=1)
+  })
+  
+  
 }
 
 

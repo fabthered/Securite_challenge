@@ -32,12 +32,12 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                                 radioButtons(
                                   inputId='protocole',
                                   label=tags$h4(strong("Protocole :"), color = "red"),
-                                  choices = c("TCP","UDP","TPC & UDP"),
+                                  choices = NULL,
                                   selected = "TCP",
                                   inline = FALSE,
                                   width = NULL,
-                                  choiceNames = NULL,
-                                  choiceValues = NULL
+                                  choiceNames = c("TCP","UDP","TCP & UDP"),
+                                  choiceValues = c("TCP","UDP","TCP & UDP")
                                 ),
                                 radioButtons(
                                   inputId='port',
@@ -70,8 +70,19 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                                   tabPanel('Analyse des flux', 
                                            plotly::plotlyOutput('proto_hist') %>% withSpinner(color="darkgrey"),
                                            plotOutput('proto_coord') %>% withSpinner(color="darkgrey"),
-                                           plotOutput('proto_bar') %>% withSpinner(color="darkgrey")
-                                           #DT::dataTableOutput("contents") %>% withSpinner(color="darkgrey")
+                                           plotOutput('proto_bar') %>% withSpinner(color="darkgrey"),
+                                           fluidRow(
+                                             column(6, 
+                                                     tags$h4(("TOP 5 IP source les plus émettrices en TCP"), color = "red"),
+                                                     tableOutput("top5_ipscr_tcp") %>% withSpinner(color="darkgrey")),
+                                             column(6, 
+                                                    tags$h4(("TOP 5 IP source les plus émettrices en UDP"), color = "red"),
+                                                    tableOutput("top5_ipscr_udp") %>% withSpinner(color="darkgrey"))
+                                           ),
+                                           tags$h4(("TOP 10 des ports inférieurs à 1024 avec un accès autorisé"), color = "red"),
+                                           tableOutput("top10_port") %>% withSpinner(color="darkgrey"),
+                                           tags$h4(("Accès aux addresses IP non inclues dans le plan d'adressage"), color = "red"),
+                                           tableOutput("adresses_ex") %>% withSpinner(color="darkgrey")
                                            ),
                                   tabPanel('Visualisation données brutes', DT::dataTableOutput("data_brut")
                                            
@@ -82,8 +93,15 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                               ) 
 
 
-
 server <- function(input, output) {
+  
+  #Filtre les données
+  logs_filter <- reactive({
+    logs %>%
+      #filter(dstport = input$port) %>%
+      filter(proto = input$protocole)
+  })
+    
   
   # affichage UDP/TCP par heure
   output$proto_hist <- plotly::renderPlotly({
@@ -116,6 +134,35 @@ server <- function(input, output) {
     axis(1, at=df_diff_proto_1$Var1, labels=df_diff_proto_1$Var1,
          tick=FALSE, las=1, line=1, cex.axis=1)
   })
+  
+  #TOP 5 des IP sources les plus émettrices en TCP
+  output$top5_ipscr_tcp <- renderTable({
+    top5_ipscr_tcp <- data.frame(head(n=5,sort(table(subset(logs, logs$proto=="TCP", select=c(ipsrc))),decreasing = TRUE)))
+    colnames(top5_ipscr_tcp) <- c('Adresse IP',"Fréquence")  
+    return(top5_ipscr_tcp)
+  })
+  
+  #TOP 5 des IP sources les plus émettrices en UDP
+  output$top5_ipscr_udp <- renderTable({
+    top5_ipscr_udp <- data.frame(head(n=5,sort(table(subset(logs, logs$proto=="UDP", select=c(ipsrc))),decreasing = TRUE)))
+    colnames(top5_ipscr_udp) <- c('Adresse IP',"Fréquence")
+    return(top5_ipscr_udp)
+  })
+
+  # TOP 10 des ports inférieurs à 1024 avec un accès autorisé
+  output$top10_port <- renderTable({
+    top10_port <- data.frame(head(n=10,sort(table(subset(logs, logs$dstport<=1024 & logs$action=="PERMIT", select=c(ipsrc))),decreasing = TRUE)))
+    colnames(top10_port) <- c('Adresse IP',"Fréquence")
+    return(top10_port)
+    })
+
+  # lister les accès des adresses non inclues dans le plan d’adressage de l’Université
+  output$adresses_ex <- renderTable({
+    adresses_ex <- data.frame(head(n=10,sort(table(subset(logs, logs$ipdst!="17.17.17.17", select=c(ipsrc))),decreasing = TRUE)))
+    colnames(adresses_ex) <- c('Adresse IP',"Fréquence")
+    return(adresses_ex)
+  })
+  
   
   
   output$data_brut <- DT::renderDataTable({

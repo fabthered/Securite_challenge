@@ -1,0 +1,104 @@
+---
+title: "Rapport_challenge_secu"
+author: "Baptiste Lanoue"
+date: "08/03/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r }
+logs <- read.table("C:/Users/bapti/Onedrive/Bureau/Securite_challenge/logs_fw-3.csv", sep=';', header=T)
+names(logs)[1] <- "id"
+```
+
+```{r}
+print(head(logs))
+```
+Classement des règles les plus utilisés 
+
+```{r}
+rank <- table(logs$policyid)
+test <- rank[order(-rank)]
+
+library(ggplot2)
+
+barplot(test)
+print(names(test))
+print(as.data.frame(test))
+ggplot(as.data.frame(test), aes(x=Var1, y = Freq)) + 
+    geom_bar(stat="identity")
+```
+```{r}
+rank <- table(logs$proto)
+test <- rank[order(-rank)]
+barplot(test)
+ggplot(as.data.frame(test), aes(x=Var1, y = Freq)) + 
+    geom_bar(stat="identity")
+
+```
+```{r}
+tcp <- logs[logs$proto =="TCP", ]
+
+rank <- table(tcp$policyid)
+test <- rank[order(-rank)]
+barplot(test)
+ggplot(as.data.frame(test), aes(x=Var1, y = Freq)) + 
+    geom_bar(stat="identity")
+```
+```{r}
+udp <- logs[logs$proto =="UDP", ]
+rank <- table(udp$policyid)
+test <- rank[order(-rank)]
+barplot(test)
+ggplot(as.data.frame(test), aes(x=Var1, y = Freq)) + 
+    geom_bar(stat="identity")
+```
+```{r}
+udp <- logs[logs$proto =="TCP", ]
+
+analy <- table(udp$policyid, udp$dstport, udp$action)
+analy <- as.data.frame(analy)
+colnames(analy)<- c("policyid","dtsport","action","freq")
+
+library(dplyr)
+df1 <- filter(analy, freq > 0)
+
+DENY <- filter(df1, action == "DENY")
+NOTDENY <- filter(df1, action != "DENY")
+
+test <- DENY[order(-DENY[,"freq"]),]
+
+by_port <- test %>% group_by(dtsport)
+
+by_port <- by_port[0:15,]
+
+p <- ggplot(by_port, aes(x = dtsport, y = freq, fill = factor(policyid)))
+p + geom_bar(stat="identity") + ggtitle("Top 15 des requêtes refusés TCP en fonction du port et de la règle")
+
+
+c <- ggplot(NOTDENY, aes(x = dtsport, y = freq, fill = factor(policyid)))
+c + geom_bar(stat="identity")  + ggtitle("Fréquence des requêtes acceptés TCP en fonction du port et de la règle")
+
+```
+```{r}
+logs$datetime <-strptime(logs$datetime, "%Y-%m-%d %H:%M:%S")
+
+```
+```{r}
+logs$datetime$mday
+```
+
+```{r}
+Deny <- subset(logs, logs$action == "DENY" & logs$proto=="TCP")
+notDeny<- subset(logs, logs$action != "DENY" & logs$proto=="TCP")
+```
+```{r}
+plot(table(Deny$datetime$yday),type="s", col="orange", ylab = "Nbr de Hits")
+lines(table(notDeny$datetime$yday),type="s", col="blue", ylab = "Nbr de Hits")
+legend("right", legend=c("Permit", "Deny"),
+ col=c("blue", "orange"), lty = 1, cex=0.8)
+```
+

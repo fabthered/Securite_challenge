@@ -13,15 +13,37 @@ library(scales)
 #library(xlsx)
 #library(stringr)
 #library(tidyverse)
+library(sqldf)
+library(FactoMineR)
+library(plotly)
+library("factoextra")
 
-#logs <- read.table("C:/Users/bapti/Onedrive/Bureau/Securite_challenge/logs_fw-3.csv", sep=';', header=T)
-logs <- read.table("~/Perso/Univ Lyon2/Challenge/données/logs_fw-3.csv", sep=';', header=T)
+
+
+logs <- read.table("C:/Users/bapti/Onedrive/Bureau/Securite_challenge/logs_fw-3.csv", sep=';', header=T)
+#logs <- read.table("~/Perso/Univ Lyon2/Challenge/données/logs_fw-3.csv", sep=';', header=T)
 logs$heure <- hour(logs$datetime)
 logs$Horaire <- logs$heure %in% seq(7, 18)
 logs$Horaire[logs$Horaire =="TRUE"] <-"Horaires ouvrés"
 logs$Horaire[logs$Horaire =="FALSE"] <-"Horaires non ouvrés"
 logs$date <- date(logs$datetime)
 nbdays <- length(unique(logs$date))
+
+analyse <- sqldf("select ipsrc, count(*) as nombre,
+                 count(distinct ipdst) as cnbripdst, count(distinct dstport) as cnportdst,
+                 sum(case when action like 'PERMIT'then 1 END) as permit,
+                 sum(case when action like 'PERMIT' AND dstport < 1024 then 1 END) as inf1024permit,
+                 sum(case when action like 'PERMIT' AND dstport >= 1024 then 1 END) as sup1024permit,
+                 sum(case when action like 'DENY' AND (dstport = 21 OR dstport = 22 OR dstport = 3389 OR dstport = 3306) then 1 END) as adminpermit,
+                 sum(case when action like 'DENY' then 1 END) as deny,
+                 sum(case when action like 'DENY' AND dstport < 1024 then 1 END) as inf1024deny,
+                 sum(case when action like 'DENY' AND dstport >= 1024 then 1 END) as sup1024deny,
+                 sum(case when action like 'DENY' AND (dstport = 21 OR dstport = 22 OR dstport = 3389 OR dstport = 3306) then 1 END) as admindeny
+                 from bdd group by ipsrc")
+
+
+analyse[is.na(analyse)] <- 0
+
                
 ## Only run examples in interactive R sessions
 
@@ -91,10 +113,23 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                                   tabPanel('Visualisation données brutes', DT::dataTableOutput("data_brut")
                                            
                                            ),
-                                  tabPanel("Parcourir")
+                                  tabPanel("Parcourir"),
+                                  
+                                  tabPanel("Data Mining",fluid = TRUE,titlePanel("filtres : "),
+                                           sidebarLayout(
+                                             sidebarPanel(
+                                               sliderInput(inputId = 'nb_clust',label =  "Nombre de groupes", min=2, max=10, value=3, step=1)
+                                             ),
+                                             mainPanel(
+                                               # Lay out the plot and table outputs in the UI as tabs.
+                                               tabsetPanel(
+                                                 tabPanel("Clustering", plotOutput("cluster")),
+                                                 tabPanel("Analyse en composantes principales", plotlyOutput('plot_ACP'))
+                                               )
+                                  
                                   )
                                 ) 
-                              ) 
+                              )))) 
 
 
 server <- function(input, output) {
@@ -107,6 +142,32 @@ server <- function(input, output) {
     } else {
       return(logs)
     }
+  })
+  
+  output$cluster <- renderPlot({
+    d = dist(analyse)
+    cah = hclust(d, method = "ward.D2")
+    plot(cah) 
+    rect.hclust(cah, k=input$nb_clust)
+  })
+  
+  output$plot_ACP<- renderPlotly({
+    
+    res.famd <- PCA(analyse[,-1], graph = FALSE)
+    ind <- get_pca_ind(res.famd)
+    coord = ind$coord
+    coord <- coord[,0:2]
+    coord_var <- res.famd$var$coord[,0:2]
+    data <- as.data.frame(coord_var)
+    graph <-  ggplot()+ theme_bw()  +
+      geom_point(aes(coord[,1],coord[,2],text=analyse[,1])) + expand_limits(x = 0, y = 0) +
+      geom_hline(yintercept = 0) +
+      geom_vline(xintercept = 0) +
+      labs(title="Analyse en Composantes Principales",
+           x ="Dimension 1", y = "Dimension 2")
+    graph
+    
+    
   })
     
   output$date_hist <- plotly::renderPlotly({

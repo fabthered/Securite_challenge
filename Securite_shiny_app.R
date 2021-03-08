@@ -54,49 +54,54 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                                   inputId='protocole',
                                   label=tags$h4(strong("Protocole :"), color = "red"),
                                   choices = NULL,
-                                  selected = "TCP",
+                                  selected = "TCP & UDP",
                                   inline = FALSE,
                                   width = NULL,
-                                  choiceNames = c("TCP","UDP","TCP & UDP"),
-                                  choiceValues = c("TCP","UDP","TCP & UDP")
+                                  choiceNames = c("TCP & UDP","TCP","UDP"),
+                                  choiceValues = c("TCP & UDP","TCP","UDP")
                                 ),
                                 radioButtons(
                                   inputId='port',
                                   label=tags$h4(strong("Ports :"), color = "red"),
-                                  choices = c("Inférieur à 1024","Supérieur à 1024","Tous les ports"),
-                                  selected = "Inférieur à 1024",
+                                  choices = c("Tous les ports","Inférieurs à 1024","Supérieurs à 1024"),
+                                  selected = "Tous les ports",
                                   inline = FALSE,
                                   width = NULL,
                                   choiceNames = NULL,
                                   choiceValues = NULL
                                 ),
-                                sliderInput("parcourir", "Se balader dans parcourir",min = 1, max = 149, value = 1),
-                                numericInput(
-                                  inputId='nb_classes',
-                                  label=tags$h4(strong("Nombre de classes :"), color = "red"),
-                                  value=1,
-                                  min = 1,
-                                  max = 10,
-                                  step = 1,
-                                  width = NULL
-                                ),
-                                checkboxInput(
-                                  inputId='inertie',
-                                  label="Inertie pour CAH",
-                                  value = FALSE,
-                                  width = NULL)
+                                # sliderInput("parcourir", "Se balader dans parcourir",min = 1, max = 149, value = 1),
+                                # numericInput(
+                                #   inputId='nb_classes',
+                                #   label=tags$h4(strong("Nombre de classes :"), color = "red"),
+                                #   value=1,
+                                #   min = 1,
+                                #   max = 10,
+                                #   step = 1,
+                                #   width = NULL
+                                # ),
+                                # checkboxInput(
+                                #   inputId='inertie',
+                                #   label="Inertie pour CAH",
+                                #   value = FALSE,
+                                #   width = NULL)
                               ),
                               mainPanel(
                                 tabsetPanel(
                                   tabPanel('Analyse des flux', 
+                                           tags$h4(("Historique des requêtes par jour par action"), color = "red"),
                                            plotly::plotlyOutput('date_hist') %>% withSpinner(color="darkgrey"),
-                                           plotly::plotlyOutput('proto_hist') %>% withSpinner(color="darkgrey"),
+                                           tags$h4(("Cumul des requêtes par heure par action"), color = "red"),
+                                           plotly::plotlyOutput('proto_hist_action') %>% withSpinner(color="darkgrey"),
                                            fluidRow(
                                              column(6, 
+                                                    tags$h4(("Cumul des requêtes par horaire"), col = "red"),
                                                     plotOutput('proto_coord') %>% withSpinner(color="darkgrey")),
                                              column(6,
+                                                    tags$h4(("Distribution des requêtes TCP/UDP"), color = "red"),
                                                     plotOutput('proto_bar') %>% withSpinner(color="darkgrey"))
                                              ),
+
                                            fluidRow(
                                              column(6, 
                                                      tags$h4(("TOP 5 IP source les plus émettrices en TCP"), color = "red"),
@@ -105,8 +110,15 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                                                     tags$h4(("TOP 5 IP source les plus émettrices en UDP"), color = "red"),
                                                     tableOutput("top5_ipscr_udp") %>% withSpinner(color="darkgrey"))
                                            ),
-                                           tags$h4(("TOP 10 des ports inférieurs à 1024 avec un accès autorisé"), color = "red"),
-                                           tableOutput("top10_port") %>% withSpinner(color="darkgrey"),
+                                           
+                                           fluidRow(
+                                             column(6, 
+                                                    tags$h4(("TOP 10 des accès autorisés à des ports inférieurs à 1024"), color = "red"),
+                                                    tableOutput("top10_port_inf") %>% withSpinner(color="darkgrey")),
+                                             column(6,
+                                                    tags$h4(("TOP 10 des accès non-autorisés à des ports supérieurs à 1024"), color = "red"),
+                                                    tableOutput("top10_port_sup") %>% withSpinner(color="darkgrey"))
+                                           ),
                                            tags$h4(("Accès aux addresses IP non inclues dans le plan d'adressage"), color = "red"),
                                            tableOutput("adresses_ex") %>% withSpinner(color="darkgrey")
                                            ),
@@ -137,10 +149,27 @@ server <- function(input, output) {
   #Filtre les données
   logs_filter <- reactive({
     if (input$protocole != "TCP & UDP") {
-      logs %>%
+      logs_filter <- logs %>%
         filter(proto == input$protocole)
+      if (input$port == "Inférieurs à 1024") {
+        logs_filter <- logs_filter %>%
+          filter(dstport <= 1024)
+      } else if (input$port == "Supérieurs à 1024") {
+          logs_filter <- logs_filter %>%
+          filter(dstport > 1024)
+      } else {
+          return(logs_filter)
+      } 
     } else {
-      return(logs)
+        if (input$port == "Inférieurs à 1024") {
+          logs_filter <- logs %>%
+            filter(dstport <= 1024)
+        } else if (input$port == "Supérieurs à 1024") {
+          logs_filter <- logs %>%
+            filter(dstport > 1024)
+        } else {
+          return(logs)
+        }
     }
   })
   
@@ -175,11 +204,10 @@ server <- function(input, output) {
       geom_histogram(bins=nbdays,colour = "grey")
   })
   
-  # affichage UDP/TCP par heure
-  output$proto_hist <- plotly::renderPlotly({
-    ggplot(logs_filter(), aes(x = heure, fill = Horaire)) +
-      geom_histogram(breaks = seq(0,24), colour = "grey") +
-      scale_fill_brewer()
+  # affichage UDP/TCP par heure par action
+  output$proto_hist_action <- plotly::renderPlotly({
+    ggplot(logs_filter(), aes(x = heure, fill = action)) +
+      geom_histogram(breaks = seq(0,24), colour = "grey")
   })
   
   
@@ -193,20 +221,17 @@ server <- function(input, output) {
     scale_x_continuous("", limits = c(0, 24),
                        breaks = seq(0, 24), labels = seq(0, 24))
     })
-    
-  output$proto_bar <- renderPlot({
-    #création d'un tableau dynamique croisé pour afficher les freq par protocole
-    diff_proto_1<-table(logs$proto)
-    df_diff_proto_1 <-as.data.frame(diff_proto_1)
-    
-    barplot(df_diff_proto_1$Freq, main="Histogramme des protocoles utilisés",
-            xlab="Protocoles",
-            ylab="Nombre de Hits",col=c("lavender","lightcyan1"))
-    #on affiche les valeurs de notre graph
-    text(x = df_diff_proto_1$Var1, y = 50000, label = df_diff_proto_1$Freq, cex =1, pos=1.9)
-    axis(1, at=df_diff_proto_1$Var1, labels=df_diff_proto_1$Var1,
-         tick=FALSE, las=1, line=1, cex.axis=1)
-  })
+  
+  
+output$proto_bar <- renderPlot({  
+  data <- as.data.frame(table(logs_filter()$proto))
+  ggplot(data, aes(x=Var1, y = Freq)) + 
+    geom_bar(stat="identity") +
+    geom_text(aes(label=Freq, vjust=-0.5)) +
+    xlab("Protocole") +
+    ylab("Nombre de requêtes")
+})  
+  
   
   #TOP 5 des IP sources les plus émettrices en TCP
   output$top5_ipscr_tcp <- renderTable({
@@ -223,11 +248,18 @@ server <- function(input, output) {
   })
 
   # TOP 10 des ports inférieurs à 1024 avec un accès autorisé
-  output$top10_port <- renderTable({
-    top10_port <- data.frame(head(n=10,sort(table(subset(logs, logs$dstport<=1024 & logs$action=="PERMIT", select=c(ipsrc))),decreasing = TRUE)))
-    colnames(top10_port) <- c('Adresse IP',"Fréquence")
-    return(top10_port)
+  output$top10_port_inf <- renderTable({
+    top10_port_inf <- data.frame(head(n=10,sort(table(subset(logs, logs$dstport<=1024 & logs$action=="PERMIT", select=c(ipsrc))),decreasing = TRUE)))
+    colnames(top10_port_inf) <- c('Adresse IP',"Fréquence")
+    return(top10_port_inf)
     })
+  
+  # TOP 10 des ports supérieurs à 1024 avec un accès non-autorisé
+  output$top10_port_sup <- renderTable({
+    top10_port_sup <- data.frame(head(n=10,sort(table(subset(logs, logs$dstport>1024 & logs$action=="DENY", select=c(ipsrc))),decreasing = TRUE)))
+    colnames(top10_port_sup) <- c('Adresse IP',"Fréquence")
+    return(top10_port_sup)
+  })
 
   # lister les accès des adresses non inclues dans le plan d’adressage de l’Université
   output$adresses_ex <- renderTable({

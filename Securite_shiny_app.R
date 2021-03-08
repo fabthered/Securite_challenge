@@ -19,9 +19,10 @@ library(plotly)
 library("factoextra")
 
 
+#logs <- read.table("C:/Users/bapti/Onedrive/Bureau/Securite_challenge/logs_fw-3.csv", sep=';', header=T)
+logs <- read.table("~/Perso/Univ Lyon2/Challenge/données/logs_fw-3.csv", sep=';', header=T)
+logs <- logs[1:1000,]
 
-logs <- read.table("C:/Users/bapti/Onedrive/Bureau/Securite_challenge/logs_fw-3.csv", sep=';', header=T)
-#logs <- read.table("~/Perso/Univ Lyon2/Challenge/données/logs_fw-3.csv", sep=';', header=T)
 logs$heure <- hour(logs$datetime)
 logs$Horaire <- logs$heure %in% seq(7, 18)
 logs$Horaire[logs$Horaire =="TRUE"] <-"Horaires ouvrés"
@@ -125,7 +126,14 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                                   tabPanel('Visualisation données brutes', DT::dataTableOutput("data_brut")
                                            
                                            ),
-                                  tabPanel("Parcourir"),
+
+                                  tabPanel("Parcourir",
+                                           tags$h4(("Visualisation des requêtes refusées par IP source"), color = "red"),
+                                           plotly::plotlyOutput('aggdata_deny') %>% withSpinner(color="darkgrey"),
+                                           tags$h4(("Visualisation des requêtes acceptées par IP source"), color = "red"),
+                                           plotly::plotlyOutput('aggdata_permit') %>% withSpinner(color="darkgrey")
+                                  ),
+         
                                   
                                   tabPanel("Data Mining",fluid = TRUE,titlePanel("filtres : "),
                                            sidebarLayout(
@@ -138,10 +146,12 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                                                  tabPanel("Clustering", plotOutput("cluster")),
                                                  tabPanel("Analyse en composantes principales", plotlyOutput('plot_ACP'))
                                                )
-                                  
+
+                                    )
+
                                   )
                                 ) 
-                              )))) 
+                              ))) 
 
 
 server <- function(input, output) {
@@ -269,9 +279,51 @@ output$proto_bar <- renderPlot({
   })
   
   
-  
   output$data_brut <- DT::renderDataTable({
     logs
+  })
+  
+  # Parcourir
+  
+  output$aggdata_deny <- plotly::renderPlotly({
+  
+      table1 <- aggregate(data=logs_filter(), dstport ~ ipsrc, function(x) length(unique(x)))
+      table2 <- aggregate(data=logs_filter(), action ~ ipsrc, function(x) sum(x=='DENY'))
+      table3 <- aggregate(data=logs_filter(), action ~ ipsrc, function(x) sum(x=='PERMIT'))
+    
+      aggdata <- cbind(table1, table2, table3)
+      aggdata <- aggdata[,c(1,2,4,6)]
+      colnames(aggdata) <- c('ipsrc','dstport','deny','permit')
+    
+      aggdata_deny <- subset(aggdata, aggdata$deny>0)
+      
+      ggplot(aggdata_deny, aes(x=dstport, y=deny, name=ipsrc)) +
+        geom_point(color='red') +
+        scale_x_log10() +
+        scale_y_log10() + 
+        xlab('Nombre de ports requêtés') +
+        ylab('Nombre de requêtes refusées')
+  
+  })
+  
+  output$aggdata_permit <- plotly::renderPlotly({
+    
+    table1 <- aggregate(data=logs_filter(), dstport ~ ipsrc, function(x) length(unique(x)))
+    table2 <- aggregate(data=logs_filter(), action ~ ipsrc, function(x) sum(x=='DENY'))
+    table3 <- aggregate(data=logs_filter(), action ~ ipsrc, function(x) sum(x=='PERMIT'))
+    
+    aggdata <- cbind(table1, table2, table3)
+    aggdata <- aggdata[,c(1,2,4,6)]
+    colnames(aggdata) <- c('ipsrc','dstport','deny','permit')
+    
+    aggdata_permit <- subset(aggdata, aggdata$permit>0)
+    
+    ggplot(aggdata_permit, aes(x=dstport, y=deny, name=ipsrc)) +
+      geom_point(color='green') +
+      scale_x_log10() +
+      scale_y_log10() + 
+      xlab('Nombre de ports requêtés') +
+      ylab('Nombre de requêtes acceptées')
     
   })
   

@@ -14,8 +14,7 @@ library(scales)
 #library(stringr)
 #library(tidyverse)
 
-
-logs <- read.table("~/Perso/Univ Lyon2/Challenge/données/logs_fw-3.csv", sep=';', header=T)
+logs <- read.table("C:/Users/bapti/Onedrive/Bureau/Securite_challenge/logs_fw-3.csv", sep=';', header=T)
 
 
 ## Only run examples in interactive R sessions
@@ -66,8 +65,8 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                                            plotly::plotlyOutput('proto_bar') %>% withSpinner(color="darkgrey")
                                            #DT::dataTableOutput("contents") %>% withSpinner(color="darkgrey")
                                            ),
-                                  tabPanel('Visualisation données brutes'
-                                           #plotly::plotlyOutput('plot_age') %>% withSpinner(color="darkgrey")
+                                  tabPanel('Visualisation données brutes', DT::dataTableOutput("data_brut")
+                                           
                                            ),
                                   tabPanel("Parcourir")
                                   )
@@ -101,6 +100,12 @@ server <- function(input, output) {
     text(x = df_diff_proto_1$Var1, y = 50000, label = df_diff_proto_1$Freq, cex =1, pos=1.9)
     axis(1, at=df_diff_proto_1$Var1, labels=df_diff_proto_1$Var1,
          tick=FALSE, las=1, line=1, cex.axis=1)
+  })
+  
+  
+  output$data_brut <- DT::renderDataTable({
+    logs
+    
   })
   
   

@@ -73,10 +73,13 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                                            plotly::plotlyOutput('proto_hist_action') %>% withSpinner(color="darkgrey"),
                                            fluidRow(
                                              column(6, 
+                                                    tags$h4(("Cumul des requêtes par horaire"), col = "red"),
                                                     plotOutput('proto_coord') %>% withSpinner(color="darkgrey")),
                                              column(6,
+                                                    tags$h4(("Distribution des requêtes TCP/UDP"), color = "red"),
                                                     plotOutput('proto_bar') %>% withSpinner(color="darkgrey"))
                                              ),
+
                                            fluidRow(
                                              column(6, 
                                                      tags$h4(("TOP 5 IP source les plus émettrices en TCP"), color = "red"),
@@ -146,13 +149,6 @@ server <- function(input, output) {
       geom_histogram(breaks = seq(0,24), colour = "grey")
   })
   
-  #   # affichage UDP/TCP par heure par horaire
-  # output$proto_hist <- plotly::renderPlotly({
-  #   ggplot(logs_filter(), aes(x = heure, fill = Horaire)) +
-  #     geom_histogram(breaks = seq(0,24), colour = "grey") +
-  #     scale_fill_brewer()
-  # })
-  
   
   # affichage coord polaires
   output$proto_coord <- renderPlot({
@@ -164,20 +160,17 @@ server <- function(input, output) {
     scale_x_continuous("", limits = c(0, 24),
                        breaks = seq(0, 24), labels = seq(0, 24))
     })
-    
-  output$proto_bar <- renderPlot({
-    #création d'un tableau dynamique croisé pour afficher les freq par protocole
-    diff_proto_1<-table(logs$proto)
-    df_diff_proto_1 <-as.data.frame(diff_proto_1)
-    
-    barplot(df_diff_proto_1$Freq, main="Histogramme des protocoles utilisés",
-            xlab="Protocoles",
-            ylab="Nombre de Hits",col=c("lavender","lightcyan1"))
-    #on affiche les valeurs de notre graph
-    text(x = df_diff_proto_1$Var1, y = 50000, label = df_diff_proto_1$Freq, cex =1, pos=1.9)
-    axis(1, at=df_diff_proto_1$Var1, labels=df_diff_proto_1$Var1,
-         tick=FALSE, las=1, line=1, cex.axis=1)
-  })
+  
+  
+output$proto_bar <- renderPlot({  
+  data <- as.data.frame(table(logs_filter()$proto))
+  ggplot(data, aes(x=Var1, y = Freq)) + 
+    geom_bar(stat="identity") +
+    geom_text(aes(label=Freq, vjust=-0.5)) +
+    xlab("Protocole") +
+    ylab("Nombre de requêtes")
+})  
+  
   
   #TOP 5 des IP sources les plus émettrices en TCP
   output$top5_ipscr_tcp <- renderTable({

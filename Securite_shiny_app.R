@@ -21,7 +21,7 @@ library("factoextra")
 
 #logs <- read.table("C:/Users/bapti/Onedrive/Bureau/Securite_challenge/logs_fw-3.csv", sep=';', header=T)
 logs <- read.table("~/Perso/Univ Lyon2/Challenge/données/logs_fw-3.csv", sep=';', header=T)
-logs <- logs[1:1000,]
+logs <- logs[1:10000,]
 
 logs$heure <- hour(logs$datetime)
 logs$Horaire <- logs$heure %in% seq(7, 18)
@@ -71,7 +71,6 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                                   choiceNames = NULL,
                                   choiceValues = NULL
                                 ),
-                                sliderInput(inputId = 'nb_clust',label =  "Nombre de groupes clustering :", min=2, max=10, value=3, step=1)
                                 # sliderInput("parcourir", "Se balader dans parcourir",min = 1, max = 149, value = 1),
                                 # numericInput(
                                 #   inputId='nb_classes',
@@ -154,10 +153,13 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                                 # ) 
                                 
                                 tabPanel("Data Mining",
-                                      tags$h4(("Clustering"), color = "red"),
-                                      plotOutput("cluster"),
+                                         fluidRow(
+                                           column(6, tags$h4(("Clustering"), color = "red")),
+                                           column(6, sliderInput(inputId = 'nb_clust',label =  "Nombre de groupes clustering :", min=2, max=10, value=3, step=1)),
+                                         ),
+                                      plotOutput("cluster") %>% withSpinner(color="darkgrey"),
                                       tags$h4(("Analyse en composantes principales"), color = "red"),
-                                      plotlyOutput('plot_ACP')
+                                      plotlyOutput('plot_ACP') %>% withSpinner(color="darkgrey")
                                            )
                                     )
                                 ) 
@@ -208,7 +210,7 @@ server <- function(input, output) {
     coord <- coord[,0:2]
     coord_var <- res.famd$var$coord[,0:2]
     data <- as.data.frame(coord_var)
-    graph <-  ggplot()+ theme_bw()  +
+    graph <-  ggplot() +
       geom_point(aes(coord[,1],coord[,2],text=analyse[,1])) + expand_limits(x = 0, y = 0) +
       geom_hline(yintercept = 0) +
       geom_vline(xintercept = 0) +
@@ -327,7 +329,7 @@ output$proto_bar <- renderPlot({
     
     aggdata_permit <- subset(aggdata, aggdata$permit>0)
     
-    ggplot(aggdata_permit, aes(x=dstport, y=deny, name=ipsrc)) +
+    ggplot(aggdata_permit, aes(x=dstport, y=permit, name=ipsrc)) +
       geom_point(color='green') +
       scale_x_log10() +
       scale_y_log10() + 

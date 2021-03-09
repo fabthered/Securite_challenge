@@ -40,7 +40,7 @@ analyse <- sqldf("select ipsrc, count(*) as nombre,
                  sum(case when action like 'DENY' AND dstport < 1024 then 1 END) as inf1024deny,
                  sum(case when action like 'DENY' AND dstport >= 1024 then 1 END) as sup1024deny,
                  sum(case when action like 'DENY' AND (dstport = 21 OR dstport = 22 OR dstport = 3389 OR dstport = 3306) then 1 END) as admindeny
-                 from bdd group by ipsrc")
+                 from logs group by ipsrc")
 
 
 analyse[is.na(analyse)] <- 0
@@ -71,6 +71,7 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                                   choiceNames = NULL,
                                   choiceValues = NULL
                                 ),
+                                sliderInput(inputId = 'nb_clust',label =  "Nombre de groupes clustering :", min=2, max=10, value=3, step=1)
                                 # sliderInput("parcourir", "Se balader dans parcourir",min = 1, max = 149, value = 1),
                                 # numericInput(
                                 #   inputId='nb_classes',
@@ -135,23 +136,32 @@ ui <- fluidPage( titlePanel("CHALLENGE SECURITE M2 SISE / OPSIE"),
                                   ),
          
                                   
-                                  tabPanel("Data Mining",fluid = TRUE,titlePanel("filtres : "),
-                                           sidebarLayout(
-                                             sidebarPanel(
-                                               sliderInput(inputId = 'nb_clust',label =  "Nombre de groupes", min=2, max=10, value=3, step=1)
-                                             ),
-                                             mainPanel(
-                                               # Lay out the plot and table outputs in the UI as tabs.
-                                               tabsetPanel(
-                                                 tabPanel("Clustering", plotOutput("cluster")),
-                                                 tabPanel("Analyse en composantes principales", plotlyOutput('plot_ACP'))
-                                               )
-
+                                #   tabPanel("Data Mining",fluid = TRUE,titlePanel("filtres : "),
+                                #            sidebarLayout(
+                                #              sidebarPanel(
+                                #                sliderInput(inputId = 'nb_clust',label =  "Nombre de groupes", min=2, max=10, value=3, step=1)
+                                #              ),
+                                #              mainPanel(
+                                #                # Lay out the plot and table outputs in the UI as tabs.
+                                #                tabsetPanel(
+                                #                  tabPanel("Clustering", plotOutput("cluster")),
+                                #                  tabPanel("Analyse en composantes principales", plotlyOutput('plot_ACP'))
+                                #                )
+                                # 
+                                #     )
+                                # 
+                                #   )
+                                # ) 
+                                
+                                tabPanel("Data Mining",
+                                      tags$h4(("Clustering"), color = "red"),
+                                      plotOutput("cluster"),
+                                      tags$h4(("Analyse en composantes principales"), color = "red"),
+                                      plotlyOutput('plot_ACP')
+                                           )
                                     )
-
-                                  )
                                 ) 
-                              ))) 
+                              )
 
 
 server <- function(input, output) {
@@ -202,8 +212,7 @@ server <- function(input, output) {
       geom_point(aes(coord[,1],coord[,2],text=analyse[,1])) + expand_limits(x = 0, y = 0) +
       geom_hline(yintercept = 0) +
       geom_vline(xintercept = 0) +
-      labs(title="Analyse en Composantes Principales",
-           x ="Dimension 1", y = "Dimension 2")
+      labs(x ="Dimension 1", y = "Dimension 2")
     graph
     
     

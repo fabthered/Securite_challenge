@@ -21,7 +21,7 @@ library("factoextra")
 
 #logs <- read.table("C:/Users/bapti/Onedrive/Bureau/Securite_challenge/logs_fw-3.csv", sep=';', header=T)
 logs <- read.table("~/Perso/Univ Lyon2/Challenge/données/logs_fw-3.csv", sep=';', header=T)
-logs <- logs[1:10000,]
+logs <- logs[1:10000,]   # reduit à 10000 lignes pour accélérer la visu
 
 logs$heure <- hour(logs$datetime)
 logs$Horaire <- logs$heure %in% seq(7, 18)
@@ -201,6 +201,7 @@ server <- function(input, output) {
     plot(cah) 
     rect.hclust(cah, k=input$nb_clust)
   })
+
   
   output$plot_ACP<- renderPlotly({
     
@@ -291,7 +292,7 @@ output$proto_bar <- renderPlot({
   
   
   output$data_brut <- DT::renderDataTable({
-    logs
+    logs_filter()
   })
   
   # Parcourir

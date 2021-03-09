@@ -1,6 +1,6 @@
 ---
 title: "Rapport_challenge_secu"
-author: "Baptiste Lanoue"
+author: "Baptiste Lanoue, Fabrice Petitfrere"
 date: "08/03/2021"
 output: word_document
 ---
@@ -10,7 +10,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r }
-logs <- read.table("C:/Users/bapti/Onedrive/Bureau/Securite_challenge/logs_fw-3.csv", sep=';', header=T)
+#logs <- read.table("C:/Users/bapti/Onedrive/Bureau/Securite_challenge/logs_fw-3.csv", sep=';', header=T)
+logs <- read.table("C:/Users/f.petitfrere.FRGINGER/Documents/Perso/Univ Lyon2/Challenge/Securite_challenge/logs_fw-3.csv", sep=';', header=T)
 names(logs)[1] <- "id"
 ```
 
@@ -88,7 +89,7 @@ logs$datetime <-strptime(logs$datetime, "%Y-%m-%d %H:%M:%S")
 
 ```
 ```{r}
-logs$datetime$mday
+#logs$datetime$mday
 ```
 
 ```{r}
